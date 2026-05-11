@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لعبة الكيمياء - كشف البطاقات</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #060c1a;
+  --accent-cyan: #00d4ff;
+  --accent-green: #00ff88;
+  --accent-gold: #f0b429;
+  --accent-red: #ff4466;
+  --accent-purple: #a855f7;
+  --text-light: #e8f0ff;
+  --text-dim: #5a72a0;
+  --card-border: #1e3060;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family:'Cairo',sans-serif;
+  background: var(--bg);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background:
+    radial-gradient(ellipse at 15% 15%, rgba(0,80,180,0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 85%, rgba(0,160,100,0.08) 0%, transparent 50%);
+  pointer-events:none; z-index:0;
+}
+
+.page { display:none; position:relative; z-index:1; }
+.page.active { display:block; }
+
+/* ══ GAME ══ */
+.game-container { max-width:860px; margin:0 auto; padding:20px 14px; }
+.game-header { text-align:center; margin-bottom:22px; }
+.badge {
+  display:inline-flex; align-items:center; gap:6px;
+  background:rgba(0,212,255,0.07); border:1px solid rgba(0,212,255,0.18);
+  border-radius:50px; padding:5px 18px; margin-bottom:10px;
+}
+.badge span { color:var(--accent-cyan); font-size:11px; letter-spacing:3px; font-weight:700; }
+h1 { font-size:clamp(24px,5vw,40px); font-weight:900; color:var(--text-light); margin-bottom:3px; }
+h1 em {
+  font-style:normal;
+  background:linear-gradient(135deg,var(--accent-cyan),var(--accent-green));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+}
+.sub { color:var(--text-dim); font-size:13px; }
+
+.stats-bar { display:flex; justify-content:center; gap:12px; margin-bottom:24px; flex-wrap:wrap; }
+.sbox {
+  background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
+  border-radius:14px; padding:10px 22px; text-align:center; min-width:100px;
+  transition:border-color .3s, box-shadow .3s;
+}
+.sbox.active { border-color:rgba(0,212,255,0.35); box-shadow:0 0 18px rgba(0,212,255,0.2); }
+.slbl { font-size:9px; color:var(--text-dim); letter-spacing:2px; margin-bottom:3px; }
+.sval { font-size:22px; font-weight:900; color:var(--text-light); }
+.sval.c{color:var(--accent-cyan)} .sval.g{color:var(--accent-gold)} .sval.gr{color:var(--accent-green)}
+
+.game-grid {
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:12px; max-width:680px; margin:0 auto 24px;
+}
+
+/* ── CARD ── */
+.card-wrapper { aspect-ratio:.72; perspective:1000px; cursor:pointer; }
+.card-inner {
+  position:relative; width:100%; height:100%;
+  transform-style:preserve-3d;
+  transition:transform .5s cubic-bezier(.4,0,.2,1);
+  border-radius:16px;
+}
+.card-wrapper.flipped .card-inner,
+.card-wrapper.matched .card-inner { transform:rotateY(180deg); }
+.card-face {
+  position:absolute; inset:0; border-radius:16px;
+  backface-visibility:hidden;
+  display:flex; align-items:center; justify-content:center; flex-direction:column;
+  overflow:hidden;
+}
+
+/* ── CARD BACK: Energy Circle ── */
+.card-back {
+  background:radial-gradient(ellipse at 50% 50%, #0b1830 0%, #060c18 100%);
+  border:1px solid #1a2f60;
+  box-shadow:0 4px 18px rgba(0,0,0,0.5);
+}
+.card-back canvas { position:absolute; inset:0; width:100%; height:100%; }
+.atom-nucleus {
+  position:relative; z-index:2;
+  width:12px; height:12px; border-radius:50%;
+  background:radial-gradient(circle, #fff 10%, #00cfff 55%, transparent 100%);
+  box-shadow:0 0 8px #00d4ff, 0 0 20px rgba(0,212,255,0.6);
+  animation:nucPulse 2s ease-in-out infinite;
+}
+@keyframes nucPulse {
+  0%,100%{box-shadow:0 0 6px #00d4ff,0 0 14px rgba(0,212,255,0.4);}
+  50%{box-shadow:0 0 14px #00d4ff,0 0 30px rgba(0,212,255,0.75);}
+}
+
+/* ── CARD FRONT ── */
+.card-front {
+  transform:rotateY(180deg);
+  border:2px solid var(--ec,#2a6aad);
+  box-shadow:0 0 22px var(--eg,rgba(0,100,200,.3)), inset 0 0 28px rgba(0,0,0,.3);
+  background:linear-gradient(145deg, var(--eb1,#0d1f3d), var(--eb2,#0a1628));
+}
+.card-front::before {
+  content:''; position:absolute; top:-30%; left:-30%; width:160%; height:160%;
+  background:radial-gradient(circle at 40% 40%, var(--eg,rgba(0,100,200,.15)) 0%, transparent 60%);
+}
+.el-num { font-size:10px; color:rgba(255,255,255,.38); font-weight:700; position:absolute; top:9px; right:11px; }
+.el-sym {
+  font-size:clamp(30px,7vw,46px); font-weight:900; color:#fff; position:relative;
+  text-shadow:0 0 18px var(--ec2,rgba(0,212,255,.8)); line-height:1; margin-bottom:3px;
+}
+.el-name { font-size:9px; color:rgba(255,255,255,.6); font-weight:700; letter-spacing:.8px; position:relative; }
+.el-mass { font-size:8px; color:rgba(255,255,255,.28); position:absolute; bottom:7px; }
+
+.card-wrapper.matched .card-front { animation:matchPulse .55s ease-out; }
+@keyframes matchPulse {
+  0%{transform:rotateY(180deg) scale(1);} 50%{transform:rotateY(180deg) scale(1.09);} 100%{transform:rotateY(180deg) scale(1);}
+}
+.card-wrapper.wrong { animation:shake .38s ease-out; }
+@keyframes shake {
+  0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);} 40%{transform:translateX(6px);}
+  60%{transform:translateX(-4px);} 80%{transform:translateX(4px);}
+}
+
+.controls { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; }
+.btn {
+  font-family:'Cairo',sans-serif; padding:11px 28px;
+  border-radius:50px; border:none; cursor:pointer;
+  font-size:14px; font-weight:700; transition:all .2s;
+}
+.btn-primary { background:linear-gradient(135deg,#0080ff,#00b4d8); color:#fff; box-shadow:0 4px 18px rgba(0,128,255,.3); }
+.btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 26px rgba(0,128,255,.45); }
+.btn-secondary { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); color:var(--text-light); }
+.btn-secondary:hover { background:rgba(255,255,255,0.09); }
+
+.name-bar { display:flex; justify-content:center; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:center; }
+.name-input {
+  font-family:'Cairo',sans-serif;
+  background:rgba(255,255,255,0.04); border:1px solid rgba(0,212,255,0.25);
+  border-radius:50px; padding:9px 20px; color:var(--text-light); font-size:14px; font-weight:600;
+  outline:none; min-width:200px; text-align:center; transition:border-color .2s, box-shadow .2s;
+}
+.name-input::placeholder { color:var(--text-dim); }
+.name-input:focus { border-color:rgba(0,212,255,0.6); box-shadow:0 0 14px rgba(0,212,255,0.2); }
+
+/* ── WIN OVERLAY ── */
+.win-overlay {
+  position:fixed; inset:0; z-index:100;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(4,8,20,0.92); backdrop-filter:blur(10px);
+  opacity:0; visibility:hidden; transition:opacity .5s,visibility .5s;
+}
+.win-overlay.active { opacity:1; visibility:visible; }
+.win-card {
+  background:linear-gradient(135deg,#0d1f3d,#0a2040);
+  border:1px solid rgba(0,212,255,0.3); border-radius:28px;
+  padding:44px 52px; text-align:center; max-width:420px; width:90%;
+  box-shadow:0 0 70px rgba(0,212,255,0.12),0 0 40px rgba(0,255,136,0.08);
+  animation:winIn .6s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes winIn { from{transform:scale(.5) translateY(50px);opacity:0;} to{transform:scale(1) translateY(0);opacity:1;} }
+.win-emoji { font-size:60px; margin-bottom:14px; display:block; animation:winBounce 1s ease-in-out infinite alternate; }
+@keyframes winBounce { from{transform:translateY(0);} to{transform:translateY(-10px);} }
+.win-title { font-size:40px; font-weight:900; background:linear-gradient(135deg,#f0b429,#ff8c00); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:6px; }
+.win-sub { color:#5a72a0; font-size:13px; margin-bottom:18px; }
+.win-stats { display:flex; justify-content:center; gap:22px; margin-bottom:26px; }
+.wstat-val { font-size:26px; font-weight:900; color:var(--accent-cyan); }
+.wstat-lbl { font-size:10px; color:var(--text-dim); letter-spacing:1px; }
+.win-actions { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+
+/* ── CONFETTI ── */
+.confetti-wrap { position:fixed; inset:0; pointer-events:none; z-index:99; overflow:hidden; }
+.cp { position:absolute; top:-20px; animation:cpFall linear forwards; }
+@keyframes cpFall {
+  0%{transform:translate(0,0) rotate(0deg);opacity:1;}
+  100%{transform:translate(var(--cx),110vh) rotate(var(--cr));opacity:.5;}
+}
+
+/* ══ DASHBOARD ══ */
+.dash-container { max-width:1000px; margin:0 auto; padding:24px 16px; }
+.dash-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:28px; flex-wrap:wrap; gap:12px;
+}
+.dash-title-wrap h2 { font-size:28px; font-weight:900; color:var(--text-light); }
+.dash-title-wrap p { color:var(--text-dim); font-size:13px; margin-top:2px; }
+
+.summary-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:30px; }
+.sum-card {
+  background:rgba(255,255,255,0.03); border-radius:18px; padding:18px 20px;
+  border:1px solid rgba(255,255,255,0.07); position:relative; overflow:hidden;
+}
+.sum-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+  background:var(--sc,#00d4ff); border-radius:18px 18px 0 0;
+}
+.sum-icon { font-size:26px; margin-bottom:8px; }
+.sum-val { font-size:28px; font-weight:900; color:var(--text-light); }
+.sum-lbl { font-size:11px; color:var(--text-dim); margin-top:2px; }
+
+.table-wrap { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.07); border-radius:20px; overflow:hidden; }
+.table-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 22px 14px; border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.table-head h3 { font-size:16px; font-weight:800; color:var(--text-light); }
+.clear-btn {
+  font-family:'Cairo',sans-serif;
+  background:rgba(255,68,102,0.1); border:1px solid rgba(255,68,102,0.25);
+  color:#ff4466; border-radius:50px; padding:6px 16px;
+  font-size:12px; cursor:pointer; font-weight:700; transition:all .2s;
+}
+.clear-btn:hover { background:rgba(255,68,102,0.2); }
+
+table { width:100%; border-collapse:collapse; }
+thead tr { background:rgba(0,212,255,0.04); }
+th { padding:11px 18px; text-align:right; font-size:11px; color:var(--text-dim); letter-spacing:1.5px; font-weight:700; border-bottom:1px solid rgba(255,255,255,0.06); }
+td { padding:12px 18px; font-size:14px; color:var(--text-light); font-weight:600; border-bottom:1px solid rgba(255,255,255,0.04); transition:background .15s; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(255,255,255,0.02); }
+td.rank-1{color:var(--accent-gold)} td.rank-2{color:#c0c0c0} td.rank-3{color:#cd7f32}
+.medal { font-size:16px; }
+.score-badge { display:inline-block; padding:3px 12px; border-radius:50px; font-size:11px; font-weight:800; }
+.score-ex{background:rgba(0,255,136,0.12);color:#00ff88}
+.score-gd{background:rgba(0,212,255,0.12);color:#00d4ff}
+.score-ok{background:rgba(240,180,41,0.12);color:#f0b429}
+.score-lw{background:rgba(255,68,102,0.12);color:#ff4466}
+
+.empty-state { text-align:center; padding:48px 20px; color:var(--text-dim); font-size:14px; }
+.empty-icon { font-size:48px; margin-bottom:12px; display:block; opacity:.4; }
+
+.chart-section { margin-top:24px; }
+.chart-section h3 { font-size:15px; font-weight:800; color:var(--text-light); margin-bottom:14px; }
+.bar-chart { display:flex; flex-direction:column; gap:8px; }
+.bar-row { display:flex; align-items:center; gap:12px; }
+.bar-name { width:80px; font-size:12px; color:var(--text-dim); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bar-track { flex:1; height:26px; background:rgba(255,255,255,0.04); border-radius:8px; overflow:hidden; }
+.bar-fill {
+  height:100%; border-radius:8px;
+  background:linear-gradient(90deg,#0080ff,#00d4ff);
+  transition:width .8s cubic-bezier(.4,0,.2,1);
+  display:flex; align-items:center; padding-right:8px; justify-content:flex-end; min-width:40px;
+}
+.bar-val { font-size:11px; font-weight:700; color:#fff; }
+.bar-time { width:55px; font-size:11px; color:var(--text-dim); text-align:left; }
+
+/* ── PASSWORD INPUT ── */
+#pwInput { direction:ltr; letter-spacing:3px; }
+
+
+  .game-grid{grid-template-columns:repeat(3,1fr);gap:9px;}
+  .win-card{padding:32px 22px;}
+  th,td{padding:9px 12px;font-size:12px;}
+}
+</style>
+</head>
+<body>
+
+<div class="confetti-wrap" id="confettiWrap"></div>
+
+<!-- WIN -->
+<div class="win-overlay" id="winOverlay">
+  <div class="win-card">
+    <span class="win-emoji">🏆</span>
+    <div class="win-title">مبروك!</div>
+    <p class="win-sub">أتممت جميع التطابقات بنجاح 🎉</p>
+    <div class="win-stats">
+      <div><div class="wstat-val" id="finalTime">--</div><div class="wstat-lbl">الوقت</div></div>
+      <div><div class="wstat-val" id="finalMoves">--</div><div class="wstat-lbl">المحاولات</div></div>
+      <div><div class="wstat-val" id="finalScore">--</div><div class="wstat-lbl">النقاط</div></div>
+    </div>
+    <div class="win-actions">
+      <button class="btn btn-primary" onclick="restartGame()">🔄 العب مجدداً</button>
+      <button class="btn btn-secondary" onclick="openPasswordModal()">📊 النتائج</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAME PAGE -->
+<div class="page active" id="gamePage">
+  <div class="game-container">
+    <header class="game-header">
+      <div class="badge"><span>⚗️ الجدول الدوري</span></div>
+      <h1>لعبة <em>الكيمياء</em></h1>
+      <p class="sub">طابق رموز العناصر الكيميائية</p>
+    </header>
+
+    <div class="name-bar">
+      <input class="name-input" id="studentName" type="text" placeholder="✏️ اكتبي اسمك هنا..." maxlength="30">
+    </div>
+
+    <div class="stats-bar">
+      <div class="sbox" id="timerBox">
+        <div class="slbl">الوقت</div>
+        <div class="sval c" id="timerDisplay">00:00</div>
+      </div>
+      <div class="sbox">
+        <div class="slbl">المحاولات</div>
+        <div class="sval g" id="movesDisplay">0</div>
+      </div>
+      <div class="sbox">
+        <div class="slbl">التطابقات</div>
+        <div class="sval gr" id="matchesDisplay">0/6</div>
+      </div>
+    </div>
+
+    <div class="game-grid" id="gameGrid"></div>
+
+    <div class="controls">
+      <button class="btn btn-primary" onclick="restartGame()">🔄 إعادة اللعبة</button>
+      <button class="btn btn-secondary" onclick="openPasswordModal()">📊 النتائج</button>
+    </div>
+  </div>
+</div>
+
+<!-- PASSWORD MODAL -->
+<div class="win-overlay" id="pwModal">
+  <div class="win-card" style="max-width:360px;">
+    <span style="font-size:48px;display:block;margin-bottom:12px;">🔒</span>
+    <div class="win-title" style="font-size:26px;margin-bottom:6px;">كلمة المرور</div>
+    <p class="win-sub" style="margin-bottom:20px;">هذه الصفحة للمعلمة فقط</p>
+    <input class="name-input" id="pwInput" type="password" placeholder="أدخلي كلمة المرور..." style="margin-bottom:14px;width:100%">
+    <p id="pwError" style="color:#ff4466;font-size:12px;margin-bottom:12px;min-height:16px;"></p>
+    <div class="win-actions">
+      <button class="btn btn-primary" onclick="checkPassword()">دخول</button>
+      <button class="btn btn-secondary" onclick="closePwModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD PAGE -->
+<div class="page" id="dashPage">
+  <div class="dash-container">
+    <div class="dash-header">
+      <div class="dash-title-wrap">
+        <h2>📊 النتائج</h2>
+        <p>نتائج الطالبات — لعبة الكيمياء</p>
+      </div>
+      <button class="btn btn-primary" onclick="showGame()">🎮 العودة للعبة</button>
+    </div>
+
+    <div class="summary-row" id="summaryRow"></div>
+
+    <div class="table-wrap">
+      <div class="table-head">
+        <h3>🏅 ترتيب الطالبات</h3>
+        <button class="clear-btn" onclick="clearResults()">🗑️ مسح النتائج</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>الاسم</th><th>الوقت</th><th>المحاولات</th><th>النقاط</th><th>التقييم</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+
+    <div class="chart-section" id="chartSection" style="display:none">
+      <h3>📈 مقارنة الأوقات والنقاط</h3>
+      <div class="bar-chart" id="barChart"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─── ELEMENTS ─── */
+const ELEMENTS = [
+  { symbol:'H',  name:'هيدروجين', number:1,  mass:'1.008',  color:'#00cfff', glow:'rgba(0,207,255,0.5)',  bg1:'#001830', bg2:'#002040', ec2:'rgba(0,207,255,0.9)' },
+  { symbol:'O',  name:'أكسجين',   number:8,  mass:'15.999', color:'#ff4466', glow:'rgba(255,68,102,0.5)', bg1:'#2a0010', bg2:'#1e000e', ec2:'rgba(255,68,102,0.9)' },
+  { symbol:'C',  name:'كربون',    number:6,  mass:'12.011', color:'#aaaaaa', glow:'rgba(180,180,180,0.4)',bg1:'#151515', bg2:'#0d0d0d', ec2:'rgba(180,180,180,0.8)' },
+  { symbol:'Fe', name:'حديد',     number:26, mass:'55.845', color:'#f0a030', glow:'rgba(240,160,48,0.5)', bg1:'#241000', bg2:'#1a0c00', ec2:'rgba(240,160,48,0.9)' },
+  { symbol:'Na', name:'صوديوم',   number:11, mass:'22.990', color:'#ffdd44', glow:'rgba(255,221,68,0.5)', bg1:'#1e1800', bg2:'#161200', ec2:'rgba(255,221,68,0.9)' },
+  { symbol:'Au', name:'ذهب',      number:79, mass:'196.97', color:'#ffd700', glow:'rgba(255,215,0,0.5)',  bg1:'#1a1400', bg2:'#120e00', ec2:'rgba(255,215,0,0.9)'  },
+];
+
+/* ─── STATE ─── */
+let flipped=[], matched=0, moves=0;
+let timer=null, seconds=0, canFlip=true, started=false;
+let results = JSON.parse(localStorage.getItem('chem_results')||'[]');
+
+/* ─── ENERGY CIRCLE ─── */
+const animHandles = new Map();
+
+function drawEnergy(canvas) {
+  const w = canvas.clientWidth || 120;
+  const h = canvas.clientHeight || 168;
+  if(canvas.width!==w||canvas.height!==h){ canvas.width=w; canvas.height=h; }
+  const ctx = canvas.getContext('2d');
+  const cx=w/2, cy=h/2, R=Math.min(w,h)*0.46;
+  const t=Date.now()/1000;
+  ctx.clearRect(0,0,w,h);
+
+  // Deep glow center
+  const grd=ctx.createRadialGradient(cx,cy,0,cx,cy,R*0.55);
+  grd.addColorStop(0,'rgba(0,180,255,0.07)');
+  grd.addColorStop(1,'transparent');
+  ctx.fillStyle=grd; ctx.fillRect(0,0,w,h);
+
+  // 3 orbital rings
+  const orbs=[
+    {r:R*.85, spd:.5,  col:'rgba(0,212,255,.22)', dots:2, ec:'rgba(0,212,255,0.9)', dc:'rgba(0,212,255,0.18)'},
+    {r:R*.6,  spd:-.8, col:'rgba(0,255,136,.18)', dots:1, ec:'rgba(0,255,136,0.9)', dc:'rgba(0,255,136,0.15)'},
+    {r:R*.38, spd:1.3, col:'rgba(168,85,247,.18)',dots:1, ec:'rgba(168,85,247,0.9)',dc:'rgba(168,85,247,0.12)'},
+  ];
+
+  orbs.forEach(o=>{
+    // dashed orbit ring
+    ctx.save();
+    ctx.setLineDash([4,6]);
+    ctx.beginPath(); ctx.arc(cx,cy,o.r,0,Math.PI*2);
+    ctx.strokeStyle=o.col; ctx.lineWidth=1; ctx.stroke();
+    ctx.restore();
+
+    for(let d=0;d<o.dots;d++){
+      const ang = t*o.spd + (d/o.dots)*Math.PI*2;
+      const ex=cx+Math.cos(ang)*o.r, ey=cy+Math.sin(ang)*o.r;
+
+      // electron trail
+      for(let tr=12;tr>0;tr--){
+        const ta=ang-(tr*0.055)*Math.sign(o.spd);
+        const tx=cx+Math.cos(ta)*o.r, ty=cy+Math.sin(ta)*o.r;
+        ctx.beginPath(); ctx.arc(tx,ty,(1-tr/13)*2.5,0,Math.PI*2);
+        ctx.fillStyle=o.dc.replace('0.12',(0.12*(1-tr/13)).toFixed(2));
+        ctx.fill();
+      }
+
+      // electron dot glow
+      const eg=ctx.createRadialGradient(ex,ey,0,ex,ey,6);
+      eg.addColorStop(0,'rgba(255,255,255,1)');
+      eg.addColorStop(.3,o.ec);
+      eg.addColorStop(1,'transparent');
+      ctx.beginPath(); ctx.arc(ex,ey,6,0,Math.PI*2);
+      ctx.fillStyle=eg; ctx.fill();
+    }
+  });
+
+  // Energy spokes (inner)
+  for(let s=0;s<8;s++){
+    const a = t*0.35 + (s/8)*Math.PI*2;
+    const r1=R*.06, r2=R*.18;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*r1, cy+Math.sin(a)*r1);
+    ctx.lineTo(cx+Math.cos(a)*r2, cy+Math.sin(a)*r2);
+    ctx.strokeStyle=`rgba(0,212,255,${0.2+Math.sin(t*2+s)*0.1})`;
+    ctx.lineWidth=1.2; ctx.stroke();
+  }
+
+  // Outer hex ring pulse
+  const hex=ctx.createRadialGradient(cx,cy,R*.88,cx,cy,R*.95);
+  hex.addColorStop(0,`rgba(0,212,255,${0.04+Math.sin(t*1.5)*0.03})`);
+  hex.addColorStop(1,'transparent');
+  ctx.beginPath(); ctx.arc(cx,cy,R*.92,0,Math.PI*2);
+  ctx.strokeStyle=`rgba(0,212,255,${0.08+Math.sin(t*1.5)*0.05})`;
+  ctx.lineWidth=1.5; ctx.stroke();
+}
+
+function startCardAnimations(){
+  // Cancel old
+  animHandles.forEach(id=>cancelAnimationFrame(id));
+  animHandles.clear();
+
+  document.querySelectorAll('.card-back canvas').forEach((c,i)=>{
+    const loop=()=>{
+      drawEnergy(c);
+      animHandles.set(i, requestAnimationFrame(loop));
+    };
+    loop();
+  });
+}
+
+/* ─── GRID ─── */
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; }
+function fmt(s){ return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
+
+function buildGrid(){
+  const grid=document.getElementById('gameGrid');
+  grid.innerHTML='';
+  shuffle([...ELEMENTS,...ELEMENTS]).forEach(el=>{
+    const w=document.createElement('div');
+    w.className='card-wrapper';
+    w.dataset.symbol=el.symbol;
+    w.innerHTML=`
+      <div class="card-inner">
+        <div class="card-face card-back">
+          <canvas></canvas>
+          <div class="atom-nucleus"></div>
+        </div>
+        <div class="card-face card-front"
+          style="--ec:${el.color};--eg:${el.glow};--ec2:${el.ec2};--eb1:${el.bg1};--eb2:${el.bg2}">
+          <div class="el-num">${el.number}</div>
+          <div class="el-sym">${el.symbol}</div>
+          <div class="el-name">${el.name}</div>
+          <div class="el-mass">${el.mass}</div>
+        </div>
+      </div>`;
+    w.addEventListener('click',()=>flipCard(w,el));
+    grid.appendChild(w);
+  });
+  startCardAnimations();
+}
+
+/* ─── GAME LOGIC ─── */
+function flipCard(w,el){
+  if(!canFlip||w.classList.contains('flipped')||w.classList.contains('matched')) return;
+  if(!started){started=true;startTimer();}
+  w.classList.add('flipped');
+  flipped.push({w,el});
+  if(flipped.length===2){canFlip=false;moves++;document.getElementById('movesDisplay').textContent=moves;checkMatch();}
+}
+
+function checkMatch(){
+  const [a,b]=flipped;
+  if(a.el.symbol===b.el.symbol){
+    setTimeout(()=>{
+      a.w.classList.add('matched'); b.w.classList.add('matched');
+      matched++;
+      document.getElementById('matchesDisplay').textContent=`${matched}/6`;
+      flipped=[]; canFlip=true;
+      if(matched===6){clearInterval(timer);setTimeout(showWin,500);}
+    },400);
+  } else {
+    a.w.classList.add('wrong'); b.w.classList.add('wrong');
+    setTimeout(()=>{a.w.classList.remove('flipped','wrong');b.w.classList.remove('flipped','wrong');flipped=[];canFlip=true;},900);
+  }
+}
+
+function startTimer(){
+  clearInterval(timer);
+  timer=setInterval(()=>{seconds++;document.getElementById('timerDisplay').textContent=fmt(seconds);},1000);
+  document.getElementById('timerBox').classList.add('active');
+}
+
+function calcScore(s,m){ return Math.max(0,Math.round(1000-s*3-m*5)); }
+
+function showWin(){
+  const sc=calcScore(seconds,moves);
+  document.getElementById('finalTime').textContent=fmt(seconds);
+  document.getElementById('finalMoves').textContent=moves;
+  document.getElementById('finalScore').textContent=sc;
+  document.getElementById('winOverlay').classList.add('active');
+  launchConfetti();
+  const name=document.getElementById('studentName').value.trim()||'طالبة';
+  results.push({name,time:seconds,moves,score:sc,date:new Date().toLocaleTimeString('ar')});
+  localStorage.setItem('chem_results',JSON.stringify(results));
+}
+
+function restartGame(){
+  clearInterval(timer);seconds=0;moves=0;matched=0;flipped=[];canFlip=true;started=false;
+  document.getElementById('timerDisplay').textContent='00:00';
+  document.getElementById('movesDisplay').textContent='0';
+  document.getElementById('matchesDisplay').textContent='0/6';
+  document.getElementById('timerBox').classList.remove('active');
+  document.getElementById('winOverlay').classList.remove('active');
+  document.getElementById('confettiWrap').innerHTML='';
+  buildGrid();
+}
+
+/* ─── CONFETTI ─── */
+function launchConfetti(){
+  const wrap=document.getElementById('confettiWrap');
+  wrap.innerHTML='';
+  const cols=['#f0b429','#00d4ff','#00ff88','#ff4466','#ff8c00','#ffffff','#a855f7'];
+  for(let i=0;i<130;i++){
+    const p=document.createElement('div');
+    const c=cols[i%cols.length], sz=6+Math.random()*10;
+    p.className='cp';
+    p.style.cssText=`left:${Math.random()*100}%;background:${c};width:${sz}px;height:${sz*(.5+Math.random()*.8)}px;border-radius:${Math.random()>.5?'50%':Math.random()>.5?'0':'2px'};--cx:${(Math.random()-.5)*320}px;--cr:${(Math.random()-.5)*720}deg;animation-duration:${2.5+Math.random()*2}s;animation-delay:${Math.random()*1.5}s;`;
+    wrap.appendChild(p);
+  }
+  setTimeout(()=>wrap.innerHTML='',6500);
+}
+
+/* ─── PASSWORD ─── */
+const TEACHER_PASS = 'chem2025';
+
+function openPasswordModal(){
+  document.getElementById('pwInput').value='';
+  document.getElementById('pwError').textContent='';
+  document.getElementById('pwModal').classList.add('active');
+  setTimeout(()=>document.getElementById('pwInput').focus(),300);
+}
+function closePwModal(){
+  document.getElementById('pwModal').classList.remove('active');
+}
+function checkPassword(){
+  const val=document.getElementById('pwInput').value;
+  if(val===TEACHER_PASS){
+    closePwModal();
+    showDashboard();
+  } else {
+    const err=document.getElementById('pwError');
+    err.textContent='❌ كلمة المرور غير صحيحة، حاولي مرة أخرى';
+    document.getElementById('pwInput').value='';
+    document.getElementById('pwInput').focus();
+    document.getElementById('pwInput').style.borderColor='#ff4466';
+    setTimeout(()=>{ err.textContent=''; document.getElementById('pwInput').style.borderColor=''; },2500);
+  }
+}
+// Allow Enter key in password field
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('pwInput').addEventListener('keydown',e=>{ if(e.key==='Enter') checkPassword(); });
+});
+
+
+function showDashboard(){
+  document.getElementById('gamePage').classList.remove('active');
+  document.getElementById('dashPage').classList.add('active');
+  document.getElementById('winOverlay').classList.remove('active');
+  renderDashboard();
+}
+function showGame(){
+  document.getElementById('dashPage').classList.remove('active');
+  document.getElementById('gamePage').classList.add('active');
+}
+
+function renderDashboard(){
+  const sorted=[...results].sort((a,b)=>b.score-a.score);
+
+  // Summary cards
+  const sr=document.getElementById('summaryRow');
+  if(!results.length){ sr.innerHTML=''; }
+  else {
+    const avgTime=Math.round(results.reduce((s,r)=>s+r.time,0)/results.length);
+    const avgMoves=Math.round(results.reduce((s,r)=>s+r.moves,0)/results.length);
+    const best=sorted[0];
+    const bestScore=sorted[sorted.length-1];
+    sr.innerHTML=`
+      <div class="sum-card" style="--sc:#f0b429">
+        <div class="sum-icon">👩‍🎓</div><div class="sum-val">${results.length}</div><div class="sum-lbl">عدد الطالبات</div>
+      </div>
+      <div class="sum-card" style="--sc:#00d4ff">
+        <div class="sum-icon">⏱️</div><div class="sum-val">${fmt(avgTime)}</div><div class="sum-lbl">متوسط الوقت</div>
+      </div>
+      <div class="sum-card" style="--sc:#00ff88">
+        <div class="sum-icon">🎯</div><div class="sum-val">${avgMoves}</div><div class="sum-lbl">متوسط المحاولات</div>
+      </div>
+      <div class="sum-card" style="--sc:#a855f7">
+        <div class="sum-icon">🏆</div><div class="sum-val">${best.name.split(' ')[0]}</div><div class="sum-lbl">الأولى</div>
+      </div>
+    `;
+  }
+
+  // Table
+  const tbody=document.getElementById('resultsBody');
+  if(!sorted.length){
+    tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state"><span class="empty-icon">🔬</span>لا توجد نتائج بعد — ابدأي اللعبة!</div></td></tr>`;
+    document.getElementById('chartSection').style.display='none'; return;
+  }
+  const medals=['🥇','🥈','🥉'];
+  tbody.innerHTML=sorted.map((r,i)=>{
+    const rk=i<3?`rank-${i+1}`:'';
+    const md=i<3?`<span class="medal">${medals[i]}</span>`:`${i+1}`;
+    let badge,bc;
+    if(r.score>=800){badge='ممتاز';bc='score-ex';}
+    else if(r.score>=600){badge='جيد جداً';bc='score-gd';}
+    else if(r.score>=400){badge='جيد';bc='score-ok';}
+    else{badge='تحتاج تدريب';bc='score-lw';}
+    return `<tr>
+      <td class="${rk}">${md}</td>
+      <td class="${rk}" style="font-weight:800">${r.name}</td>
+      <td>${fmt(r.time)}</td>
+      <td>${r.moves}</td>
+      <td class="${rk}" style="font-size:16px;font-weight:900">${r.score}</td>
+      <td><span class="score-badge ${bc}">${badge}</span></td>
+    </tr>`;
+  }).join('');
+
+  // Chart
+  const cs=document.getElementById('chartSection'); cs.style.display='block';
+  const topN=sorted.slice(0,8), maxSc=Math.max(...topN.map(r=>r.score));
+  document.getElementById('barChart').innerHTML=topN.map(r=>`
+    <div class="bar-row">
+      <div class="bar-name" title="${r.name}">${r.name.split(' ')[0]}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${Math.max(8,(r.score/maxSc)*100)}%">
+          <span class="bar-val">${r.score}</span>
+        </div>
+      </div>
+      <div class="bar-time">${fmt(r.time)}</div>
+    </div>
+  `).join('');
+}
+
+function clearResults(){
+  if(!confirm('هل أنت متأكدة من مسح جميع النتائج؟')) return;
+  results=[]; localStorage.removeItem('chem_results'); renderDashboard();
+}
+
+buildGrid();
+</script>
+</body>
+</html>
