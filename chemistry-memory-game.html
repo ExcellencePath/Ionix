@@ -256,8 +256,6 @@ td.rank-1{color:var(--accent-gold)} td.rank-2{color:#c0c0c0} td.rank-3{color:#cd
 .bar-val { font-size:11px; font-weight:700; color:#fff; }
 .bar-time { width:55px; font-size:11px; color:var(--text-dim); text-align:left; }
 
-/* ── PASSWORD INPUT ── */
-#pwInput { direction:ltr; letter-spacing:3px; }
 
 
   .game-grid{grid-template-columns:repeat(3,1fr);gap:9px;}
@@ -283,7 +281,7 @@ td.rank-1{color:var(--accent-gold)} td.rank-2{color:#c0c0c0} td.rank-3{color:#cd
     </div>
     <div class="win-actions">
       <button class="btn btn-primary" onclick="restartGame()">🔄 العب مجدداً</button>
-      <button class="btn btn-secondary" onclick="openPasswordModal()">📊 النتائج</button>
+      <button class="btn btn-secondary" onclick="showDashboard()">📊 النتائج</button>
     </div>
   </div>
 </div>
@@ -320,22 +318,7 @@ td.rank-1{color:var(--accent-gold)} td.rank-2{color:#c0c0c0} td.rank-3{color:#cd
 
     <div class="controls">
       <button class="btn btn-primary" onclick="restartGame()">🔄 إعادة اللعبة</button>
-      <button class="btn btn-secondary" onclick="openPasswordModal()">📊 النتائج</button>
-    </div>
-  </div>
-</div>
-
-<!-- PASSWORD MODAL -->
-<div class="win-overlay" id="pwModal">
-  <div class="win-card" style="max-width:360px;">
-    <span style="font-size:48px;display:block;margin-bottom:12px;">🔒</span>
-    <div class="win-title" style="font-size:26px;margin-bottom:6px;">كلمة المرور</div>
-    <p class="win-sub" style="margin-bottom:20px;">هذه الصفحة للمعلمة فقط</p>
-    <input class="name-input" id="pwInput" type="password" placeholder="أدخلي كلمة المرور..." style="margin-bottom:14px;width:100%">
-    <p id="pwError" style="color:#ff4466;font-size:12px;margin-bottom:12px;min-height:16px;"></p>
-    <div class="win-actions">
-      <button class="btn btn-primary" onclick="checkPassword()">دخول</button>
-      <button class="btn btn-secondary" onclick="closePwModal()">إلغاء</button>
+      <button class="btn btn-secondary" onclick="showDashboard()">📊 النتائج</button>
     </div>
   </div>
 </div>
@@ -582,37 +565,6 @@ function launchConfetti(){
   }
   setTimeout(()=>wrap.innerHTML='',6500);
 }
-
-/* ─── PASSWORD ─── */
-const TEACHER_PASS = 'chem2025';
-
-function openPasswordModal(){
-  document.getElementById('pwInput').value='';
-  document.getElementById('pwError').textContent='';
-  document.getElementById('pwModal').classList.add('active');
-  setTimeout(()=>document.getElementById('pwInput').focus(),300);
-}
-function closePwModal(){
-  document.getElementById('pwModal').classList.remove('active');
-}
-function checkPassword(){
-  const val=document.getElementById('pwInput').value;
-  if(val===TEACHER_PASS){
-    closePwModal();
-    showDashboard();
-  } else {
-    const err=document.getElementById('pwError');
-    err.textContent='❌ كلمة المرور غير صحيحة، حاولي مرة أخرى';
-    document.getElementById('pwInput').value='';
-    document.getElementById('pwInput').focus();
-    document.getElementById('pwInput').style.borderColor='#ff4466';
-    setTimeout(()=>{ err.textContent=''; document.getElementById('pwInput').style.borderColor=''; },2500);
-  }
-}
-// Allow Enter key in password field
-document.addEventListener('DOMContentLoaded',()=>{
-  document.getElementById('pwInput').addEventListener('keydown',e=>{ if(e.key==='Enter') checkPassword(); });
-});
 
 
 function showDashboard(){
